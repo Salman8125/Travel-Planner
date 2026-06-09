@@ -1,0 +1,5 @@
+server
+.git
+.gitignore
+Dockerfile
+.dockerignore

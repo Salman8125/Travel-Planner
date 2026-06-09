@@ -1,0 +1,26 @@
+# Node
+node_modules/
+dist/
+npm-debug.log*
+
+# Java / Maven
+target/
+*.class
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Go
+/weathervane/backend/server
+
+# .NET
+bin/
+obj/
+
+# Misc
+.DS_Store
+*.local
+.env
