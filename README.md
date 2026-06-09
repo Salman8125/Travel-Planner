@@ -92,11 +92,11 @@ curl -X POST http://localhost:4005/build_itinerary \
 travel-planner/
 ├── docker-compose.yml          # all 10 services
 ├── contracts/                  # language-neutral shape + endpoint docs (one per product)
-├── skyscout/   backend/ (Node+TS)        frontend/ (React)     # flights
-├── roost/      backend/ (Spring Boot)    frontend/ (Angular)   # hotels
-├── pennypilot/ backend/ (FastAPI)        frontend/ (Svelte)    # budget
-├── weathervane/backend/ (Go)             frontend/ (Vue)       # weather
-└── tripweaver/ backend/ (ASP.NET)        frontend/ (SolidJS)   # itinerary
+├── SkyScout/   backend/ (Node+TS)        frontend/ (React)     # flights
+├── Roost/      backend/ (Spring Boot)    frontend/ (Angular)   # hotels
+├── PennyPilot/ backend/ (FastAPI)        frontend/ (Svelte)    # budget
+├── Weathervane/backend/ (Go)             frontend/ (Vue)       # weather
+└── TripWeaver/ backend/ (ASP.NET)        frontend/ (SolidJS)   # itinerary
 ```
 
 Every `backend/` and `frontend/` has its own `Dockerfile` + `.dockerignore`; every frontend
@@ -121,25 +121,25 @@ Each backend can run on its own with its native toolchain (frontends default to
 
 ```bash
 # SkyScout backend (Node 22+)
-cd skyscout/backend && npm install && npm run dev          # or: npm run build && npm start  → :4001
+cd SkyScout/backend && npm install && npm run dev          # or: npm run build && npm start  → :4001
 
 # Roost backend (JDK 21 + Maven)
-cd roost/backend && mvn spring-boot:run                     # → :4002
+cd Roost/backend && mvn spring-boot:run                     # → :4002
 
 # PennyPilot backend (Python 3.12+)
-cd pennypilot/backend && pip install -r requirements.txt && \
+cd PennyPilot/backend && pip install -r requirements.txt && \
   uvicorn app.http.main:app --host 0.0.0.0 --port 4003      # → :4003
 
 # Weathervane backend (Go 1.23+)
-cd weathervane/backend && go run ./cmd/server               # → :4004
+cd Weathervane/backend && go run ./cmd/server               # → :4004
 
 # TripWeaver backend (.NET 8 SDK)
-cd tripweaver/backend && dotnet run                         # → :4005
+cd TripWeaver/backend && dotnet run                         # → :4005
 
 # any Vite frontend (Node 22+)
-cd skyscout/frontend && npm install && npm run dev          # Vite dev port (see terminal)
+cd SkyScout/frontend && npm install && npm run dev          # Vite dev port (see terminal)
 # Roost (Angular):
-cd roost/frontend && npm install && npm start               # → :4200
+cd Roost/frontend && npm install && npm start               # → :4200
 ```
 
 Override a frontend's backend URL when running standalone by setting the build/env var

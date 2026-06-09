@@ -14,7 +14,7 @@ __pycache__/
 venv/
 
 # Go
-/weathervane/backend/server
+/Weathervane/backend/server
 
 # .NET
 bin/

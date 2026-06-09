@@ -12,12 +12,12 @@
 services:
   # ---------------- SkyScout — flights (Node+TS / React) ----------------
   skyscout-backend:
-    build: ./skyscout/backend
+    build: ./SkyScout/backend
     ports: ["4001:4001"]
 
   skyscout-frontend:
     build:
-      context: ./skyscout/frontend
+      context: ./SkyScout/frontend
       args:
         VITE_API_URL: http://localhost:4001
     ports: ["3001:80"]
@@ -25,12 +25,12 @@ services:
 
   # ---------------- Roost — hotels (Spring Boot / Angular) ----------------
   roost-backend:
-    build: ./roost/backend
+    build: ./Roost/backend
     ports: ["4002:4002"]
 
   roost-frontend:
     build:
-      context: ./roost/frontend
+      context: ./Roost/frontend
       args:
         API_URL: http://localhost:4002
     ports: ["3002:80"]
@@ -38,12 +38,12 @@ services:
 
   # ---------------- PennyPilot — budget (FastAPI / Svelte) ----------------
   pennypilot-backend:
-    build: ./pennypilot/backend
+    build: ./PennyPilot/backend
     ports: ["4003:4003"]
 
   pennypilot-frontend:
     build:
-      context: ./pennypilot/frontend
+      context: ./PennyPilot/frontend
       args:
         VITE_API_URL: http://localhost:4003
     ports: ["3003:80"]
@@ -51,12 +51,12 @@ services:
 
   # ---------------- Weathervane — weather (Go / Vue) ----------------
   weathervane-backend:
-    build: ./weathervane/backend
+    build: ./Weathervane/backend
     ports: ["4004:4004"]
 
   weathervane-frontend:
     build:
-      context: ./weathervane/frontend
+      context: ./Weathervane/frontend
       args:
         VITE_API_URL: http://localhost:4004
     ports: ["3004:80"]
@@ -64,12 +64,12 @@ services:
 
   # ---------------- TripWeaver — itinerary (ASP.NET / SolidJS) ----------------
   tripweaver-backend:
-    build: ./tripweaver/backend
+    build: ./TripWeaver/backend
     ports: ["4005:4005"]
 
   tripweaver-frontend:
     build:
-      context: ./tripweaver/frontend
+      context: ./TripWeaver/frontend
       args:
         VITE_API_URL: http://localhost:4005
     ports: ["3005:80"]
