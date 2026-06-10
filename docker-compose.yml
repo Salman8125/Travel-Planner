@@ -10,10 +10,35 @@
 # inline env vars at build time), which is why it lives under build.args, not environment.
 
 services:
-  # ---------------- SkyScout — flights (Node+TS / React) ----------------
+  # ---------------- SkyScout — flights (Node+TS+Postgres / React) ----------------
+  skyscout-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: skyscout
+      POSTGRES_USER: skyscout
+      POSTGRES_PASSWORD: skyscout
+    volumes:
+      - skyscout-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyscout -d skyscout"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   skyscout-backend:
     build: ./SkyScout/backend
     ports: ["4001:4001"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://skyscout:skyscout@skyscout-db:5432/skyscout
+      PGHOST: skyscout-db
+      PGPORT: "5432"
+      PGUSER: skyscout
+      JWT_SECRET: dev-insecure-skyscout-jwt-secret-change-me
+      SEED_ON_START: "true"
+    depends_on:
+      skyscout-db:
+        condition: service_healthy
 
   skyscout-frontend:
     build:
@@ -107,3 +132,4 @@ services:
 
 volumes:
   pennypilot-db-data:
+  skyscout-db-data:
