@@ -5,7 +5,7 @@ deliberately different stack, proving the system is language-agnostic:
 
 - ✈️ **SkyScout** — flight search
 - 🏨 **Roost** — hotel search
-- 💰 **PennyPilot** — budget tracking (stateful)
+- 💰 **PennyPilot** — budget tracking (Django + Postgres, per-user with login)
 - 🌤️ **Weathervane** — weather forecast
 - 🧳 **TripWeaver** — itinerary builder
 
@@ -14,7 +14,8 @@ database, and no [A2A](https://github.com/google/A2A) protocol layer (a later ph
 top of the backends). Each backend already separates a **pure domain layer** from a **thin HTTP
 layer** so A2A can wrap the domain logic later without a rewrite.
 
-The whole system is Dockerized: **`docker compose up --build`** starts all 10 services.
+The whole system is Dockerized: **`docker compose up --build`** starts all 10 services (plus a
+Postgres database for PennyPilot — 11 containers in total).
 
 ## Products
 
@@ -22,7 +23,7 @@ The whole system is Dockerized: **`docker compose up --build`** starts all 10 se
 |--------------|-----------|--------------------|---------|----------------|---------|-----------------------|
 | **SkyScout**    | flights   | Node + TypeScript  | 4001    | React (Vite)   | 3001    | http://localhost:3001 |
 | **Roost**       | hotels    | Java + Spring Boot | 4002    | Angular        | 3002    | http://localhost:3002 |
-| **PennyPilot**  | budget    | Python + FastAPI   | 4003    | Svelte (Vite)  | 3003    | http://localhost:3003 |
+| **PennyPilot**  | budget    | Python + Django + Postgres | 4003 | Svelte (Vite) | 3003 | http://localhost:3003 |
 | **Weathervane** | weather   | Go (stdlib)        | 4004    | Vue (Vite)     | 3004    | http://localhost:3004 |
 | **TripWeaver**  | itinerary | C# / ASP.NET       | 4005    | SolidJS (Vite) | 3005    | http://localhost:3005 |
 
@@ -41,7 +42,8 @@ there is no shared code package across languages.
 docker compose up --build
 ```
 
-This builds and starts all 10 containers. Open any frontend URL from the table above. Each
+This builds and starts everything (the 10 services + the PennyPilot Postgres database). Open any
+frontend URL from the table above. Each
 frontend calls **only its own backend** over plain REST at `http://localhost:<backendPort>`
 (the published host port), cross-origin via CORS.
 
@@ -68,13 +70,18 @@ curl -X POST http://localhost:4002/search_hotels \
 curl -X POST http://localhost:4002/get_hotel_details \
   -H "Content-Type: application/json" -d '{"hotelId":"HT-2001"}'
 
-# PennyPilot — budget (4003) — STATEFUL: set, then check, then read remaining
+# PennyPilot — budget (4003) — Django + Postgres, per-user, auth required.
+# 1) register (or login) to get a token, then send it as: Authorization: Token <token>
+curl -X POST http://localhost:4003/register \
+  -H "Content-Type: application/json" -d '{"username":"alice","password":"s3cretpw123"}'
+# 2) use the returned token (export TOKEN=...) on the budget skills:
 curl -X POST http://localhost:4003/set_budget \
-  -H "Content-Type: application/json" -d '{"totalBudget":5000}'
+  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{"totalBudget":5000}'
 curl -X POST http://localhost:4003/check_expense \
-  -H "Content-Type: application/json" -d '{"amount":1200}'
+  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{"amount":1200}'
 curl -X POST http://localhost:4003/get_remaining_budget \
-  -H "Content-Type: application/json" -d '{}'
+  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{}'
+# Django admin (inspect users/budgets/expenses): http://localhost:4003/admin  (admin / admin)
 
 # Weathervane — weather (4004)
 curl -X POST http://localhost:4004/get_forecast \
@@ -90,13 +97,13 @@ curl -X POST http://localhost:4005/build_itinerary \
 
 ```
 travel-planner/
-├── docker-compose.yml          # all 10 services
+├── docker-compose.yml          # 10 services + a Postgres db for PennyPilot
 ├── contracts/                  # language-neutral shape + endpoint docs (one per product)
-├── SkyScout/   backend/ (Node+TS)        frontend/ (React)     # flights
-├── Roost/      backend/ (Spring Boot)    frontend/ (Angular)   # hotels
-├── PennyPilot/ backend/ (FastAPI)        frontend/ (Svelte)    # budget
-├── Weathervane/backend/ (Go)             frontend/ (Vue)       # weather
-└── TripWeaver/ backend/ (ASP.NET)        frontend/ (SolidJS)   # itinerary
+├── SkyScout/   backend/ (Node+TS)            frontend/ (React)     # flights
+├── Roost/      backend/ (Spring Boot)        frontend/ (Angular)   # hotels
+├── PennyPilot/ backend/ (Django + Postgres)  frontend/ (Svelte)    # budget
+├── Weathervane/backend/ (Go)                 frontend/ (Vue)       # weather
+└── TripWeaver/ backend/ (ASP.NET)            frontend/ (SolidJS)   # itinerary
 ```
 
 Every `backend/` and `frontend/` has its own `Dockerfile` + `.dockerignore`; every frontend
@@ -111,8 +118,10 @@ Each backend keeps two layers separate:
 - **HTTP layer** — a thin server exposing one `POST /<skill>` endpoint per skill: parse body →
   call a domain function → return JSON. It exists only so the product runs standalone now.
 
-No backend imports or calls another backend. **PennyPilot** is **stateful** (in-memory),
-running a single worker; its state resets on restart.
+No backend imports or calls another backend. **PennyPilot** persists per-user budgets in
+**PostgreSQL** and is protected with **DRF Token auth** (register/login → token); its pure budget
+rules live in `PennyPilot/backend/budget/domain.py`, separate from the Django models (persistence)
+and DRF views (HTTP). Django **admin** is at `http://localhost:4003/admin` (`admin` / `admin`).
 
 ## Run a single product standalone (without Docker)
 
@@ -126,9 +135,10 @@ cd SkyScout/backend && npm install && npm run dev          # or: npm run build &
 # Roost backend (JDK 21 + Maven)
 cd Roost/backend && mvn spring-boot:run                     # → :4002
 
-# PennyPilot backend (Python 3.12+)
+# PennyPilot backend (Python 3.12+, needs a Postgres reachable via POSTGRES_* env vars)
 cd PennyPilot/backend && pip install -r requirements.txt && \
-  uvicorn app.http.main:app --host 0.0.0.0 --port 4003      # → :4003
+  python manage.py migrate && \
+  python manage.py runserver 0.0.0.0:4003                    # → :4003 (admin at /admin)
 
 # Weathervane backend (Go 1.23+)
 cd Weathervane/backend && go run ./cmd/server               # → :4004
