@@ -1,7 +1,13 @@
 node_modules
 dist
+coverage
 npm-debug.log*
 .git
 .gitignore
+.env
+.env.*
+e2e
+test-results
+playwright-report
 Dockerfile
 .dockerignore

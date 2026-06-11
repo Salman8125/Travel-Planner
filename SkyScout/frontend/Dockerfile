@@ -1,10 +1,7 @@
-# Multi-stage: build the static SPA, then serve it with nginx.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
-# Backend URL is baked at BUILD time (Vite inlines import.meta.env.VITE_* into the bundle).
-# A runtime env var on the nginx container would NOT reach the browser.
+RUN npm ci
 ARG VITE_API_URL=http://localhost:4001
 ENV VITE_API_URL=$VITE_API_URL
 COPY . .
