@@ -1,7 +1,16 @@
 node_modules
+build
+.svelte-kit
 dist
+.env
+.env.*.local
 npm-debug.log*
 .git
 .gitignore
 Dockerfile
 .dockerignore
+test-results
+playwright-report
+playwright/.cache
+e2e
+.vscode

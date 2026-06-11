@@ -23,7 +23,7 @@ Postgres database for PennyPilot — 11 containers in total).
 |--------------|-----------|--------------------|---------|----------------|---------|-----------------------|
 | **SkyScout**    | flights   | Node + TypeScript  | 4001    | React (Vite)   | 3001    | http://localhost:3001 |
 | **Roost**       | hotels    | Java + Spring Boot | 4002    | Angular        | 3002    | http://localhost:3002 |
-| **PennyPilot**  | budget    | Python + Django + Postgres | 4003 | Svelte (Vite) | 3003 | http://localhost:3003 |
+| **PennyPilot**  | budget    | Python + Django + Postgres | 4003 | SvelteKit (SPA) | 3003 | http://localhost:3003 |
 | **Weathervane** | weather   | Go (stdlib)        | 4004    | Vue (Vite)     | 3004    | http://localhost:3004 |
 | **TripWeaver**  | itinerary | C# / ASP.NET       | 4005    | SolidJS (Vite) | 3005    | http://localhost:3005 |
 
@@ -104,7 +104,7 @@ travel-planner/
 ├── contracts/                  # language-neutral shape + endpoint docs (one per product)
 ├── SkyScout/   backend/ (Node+TS)            frontend/ (React)     # flights
 ├── Roost/      backend/ (Spring Boot)        frontend/ (Angular)   # hotels
-├── PennyPilot/ backend/ (Django + Postgres)  frontend/ (Svelte)    # budget
+├── PennyPilot/ backend/ (Django + Postgres)  frontend/ (SvelteKit) # budget
 ├── Weathervane/backend/ (Go)                 frontend/ (Vue)       # weather
 └── TripWeaver/ backend/ (ASP.NET)            frontend/ (SolidJS)   # itinerary
 ```

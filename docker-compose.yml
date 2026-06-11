@@ -94,7 +94,7 @@ services:
     build:
       context: ./PennyPilot/frontend
       args:
-        VITE_API_URL: http://localhost:4003
+        PUBLIC_API_URL: http://localhost:4003
     ports: ["3003:80"]
     depends_on: [pennypilot-backend]
 
