@@ -1,89 +1,70 @@
 # PennyPilot (budget) contract
 
-Product: **PennyPilot** — budget tracking. Backend stack: **Python + Django + Django REST
-Framework**, backed by **PostgreSQL**. Published port: **4003**.
+Product: **PennyPilot** — budget & expense management. Backend stack: **Python + Django + Django REST
+Framework + PostgreSQL**. Published port: **4003** (gunicorn serves `:8000` in-container).
 
-> Language-neutral contract. Budgets are **persisted per user** in Postgres (no longer in-memory)
-> and survive restarts. Endpoints are protected with **DRF Token authentication**. The pure
-> budget rules live in a framework-agnostic domain layer (`budget/domain.py`) so the later A2A
-> phase can wrap them. NO shared code package; does NOT call any other backend.
+> Production-grade REST API (this replaces the old mock `POST /set_budget` surface). Base path `/api`.
+> Success responses use `{ data, meta? }`; errors use `{ error: { code, message, details?, requestId } }`.
+> Money is a 2-decimal **string** with an ISO `currency`. Authenticated routes use a **JWT bearer** token
+> (access + refresh). Interactive docs live at **`/docs`** (raw spec at **`/schema`**) and are the source
+> of truth for exact shapes. All business logic lives in a transport-agnostic **service/selector layer**
+> (A2A-ready). This backend does NOT call any other backend.
 
-## Authentication
+## Auth (JWT bearer)
+- `POST /api/auth/register` `{ email, password }` → 201 `{ access, refresh, user }`
+- `POST /api/auth/login` `{ email, password }` → 200 `{ access, refresh, user }`
+- `POST /api/auth/refresh` `{ refresh }` → 200 `{ access }`
+- `GET  /api/auth/me` (bearer) → 200 `{ id, email, role }`
 
-Token-based. Register or log in to obtain a token, then send it on every budget call:
+Send `Authorization: Bearer <access>` on authenticated routes. Login returns a generic `401` for both a
+wrong password and an unknown email (no email-existence leak). Auth endpoints are throttled harder (10/min).
 
-```
-Authorization: Token <token>
-```
+## Budgets (owner-scoped; admin sees all)
+- `POST /api/budgets` — create `{ name, total_amount, currency, period, start_date, end_date?, allow_overspend? }`.
+- `GET  /api/budgets` — list own (paginated; filter `status|currency|period`; `ordering`).
+- `GET  /api/budgets/:id` — detail (404 if not owner / soft-deleted).
+- `PATCH /api/budgets/:id` — update name / total_amount / allow_overspend / period / dates.
+- `POST /api/budgets/:id/close` — set `CLOSED` (no further expenses).
+- `DELETE /api/budgets/:id` — **409 `budget_has_expenses`** if expenses exist, else soft-delete.
+- `GET  /api/budgets/:id/status` — computed BudgetStatus.
+- `POST /api/budgets/:id/check` — preview `{ amount, currency?, category_id? }` → `{ approved, spent,
+  remaining, wouldOverspend, reason? }` **without committing**.
 
-### POST /register
-Create a user and return a token.
-```json
-// request
-{ "username": "alice", "password": "s3cretpw123" }
-// response 201
-{ "token": "c7c1d66c09283afa06b1b22c116912ed", "username": "alice" }
-```
-Errors: `400` if username/password missing or username already taken.
+## Categories (optional allocation buckets)
+- `GET/POST /api/budgets/:id/categories` · `PATCH/DELETE /api/categories/:id`. Unique `(budget, name)`;
+  the sum of a budget's allocations must stay ≤ the budget total.
 
-### POST /login
-Authenticate and return the user's token.
-```json
-// request
-{ "username": "alice", "password": "s3cretpw123" }
-// response 200
-{ "token": "c7c1d66c09283afa06b1b22c116912ed", "username": "alice" }
-```
-Errors: `401` on invalid credentials.
+## Expenses (the transactional path)
+- `POST /api/budgets/:id/expenses` — record `{ amount, currency?, date, description?, category_id? }`;
+  supports an `Idempotency-Key` header (replay returns the original expense, **200**). The critical path:
+  row-locked budget (`SELECT … FOR UPDATE`) → remaining check → write Expense → bump `spent_amount`, all
+  atomically. Over budget → **409 `insufficient_funds`** (unless `allow_overspend`); the budget never goes
+  negative. 201 (or 200 on replay).
+- `GET  /api/budgets/:id/expenses` — list (paginated; filter `status|category|date_from|date_to`).
+- `GET  /api/expenses/:id` — detail.
+- `PATCH /api/expenses/:id` — edit amount / description / date / category — re-validated under lock.
+- `POST /api/expenses/:id/void` — reverse; returns the amount to remaining; double-void is idempotent (200).
 
-All budget endpoints below return `401` if the `Authorization: Token <token>` header is missing
-or invalid. Each user has their own budget + expense history.
+## Business rules
+Strict overspend by default (`allow_overspend` permits it and flags `overspent`). Expense currency MUST
+equal the budget currency (else 400). A category must belong to the budget; per-category allocations are
+enforced. Expense date must fall within the budget period when `end_date` is set. Closed budgets reject
+new/edited expenses (409). Two concurrent expenses for the last funds → exactly one 201, the other 409,
+balance never negative.
 
-## Data shapes
+## Data shapes (full schemas at `/schema`)
+- **Budget** `{ id, name, total_amount, spent_amount, remaining, currency, period (ONE_TIME|WEEKLY|MONTHLY|
+  YEARLY), start_date, end_date?, status (ACTIVE|CLOSED), allow_overspend, created_at, updated_at }`
+- **Category** `{ id, budget, name, allocated_amount }`
+- **Expense** `{ id, budget, category?, category_name?, description, amount, currency, date,
+  status (RECORDED|VOIDED), overspent, created_at, updated_at }`
+- **BudgetStatus** `{ totalBudget, spent, remaining, currency, perCategory: [{ category, categoryId,
+  allocated, spent, remaining }] }`
 
-### BudgetStatus
-| field       | type   | notes                       |
-|-------------|--------|-----------------------------|
-| totalBudget | number | total budget set (USD)      |
-| spent       | number | cumulative approved spend   |
-| remaining   | number | `totalBudget - spent`       |
+## Ops
+- `GET /health` (liveness) · `GET /ready` (DB ping; 503 if down) · `GET /docs` (Swagger UI) · `GET /schema`
+- Django admin at **`/admin`** (seeded `admin@pennypilot.dev` / `admin12345`).
 
-### ExpenseResult (response of check_expense)
-| field     | type    | notes                                   |
-|-----------|---------|-----------------------------------------|
-| approved  | boolean | true iff `amount <= remaining`          |
-| remaining | number  | remaining AFTER applying (if approved)  |
-| spent     | number  | cumulative spend AFTER applying         |
-
-## Endpoints (all require the auth token)
-
-### POST /set_budget
-Set (or reset) the current user's total budget. Clears their expenses, so `spent` resets to 0.
-```json
-// request                          // response: BudgetStatus
-{ "totalBudget": 5000 }             { "totalBudget": 5000.0, "spent": 0.0, "remaining": 5000.0 }
-```
-
-### POST /check_expense
-Attempt to record an expense for the current user. Approved iff `amount <= remaining`; if
-approved, `spent` increases. The attempt is stored (approved or rejected) for history.
-```json
-// request                          // response: ExpenseResult
-{ "amount": 1200 }                  { "approved": true, "remaining": 3800.0, "spent": 1200.0 }
-```
-
-### POST /get_remaining_budget
-Return the current user's budget status.
-```json
-// request: {}                      // response: BudgetStatus
-                                    { "totalBudget": 5000.0, "spent": 1200.0, "remaining": 3800.0 }
-```
-
-## Admin
-
-Django admin is enabled at **`/admin`** (default superuser `admin` / `admin`, set via env) for
-inspecting users, budgets, and expenses.
-
-## CORS
-Permissive (dev only): any origin, allows the `Authorization` + `Content-Type` headers. Token
-auth means no cookies, so allow-all-origins is safe here.
+## Notes
+- Seeded dev accounts: `admin@pennypilot.dev` / `admin12345` (ADMIN), `user@pennypilot.dev` / `user12345` (USER).
+- The Svelte frontend is **pending rebuild** against this REST API; the old mock `/set_budget` shape is retired.

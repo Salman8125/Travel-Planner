@@ -78,20 +78,14 @@ services:
 
   pennypilot-backend:
     build: ./PennyPilot/backend
-    ports: ["4003:4003"]
+    ports: ["4003:8000"]
     environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
       DJANGO_SECRET_KEY: dev-insecure-pennypilot-secret-key
       DJANGO_DEBUG: "false"
       DJANGO_ALLOWED_HOSTS: "*"
-      POSTGRES_DB: pennypilot
-      POSTGRES_USER: pennypilot
-      POSTGRES_PASSWORD: pennypilot
-      POSTGRES_HOST: pennypilot-db
-      POSTGRES_PORT: "5432"
-      # Django admin superuser (created on startup). Visit http://localhost:4003/admin
-      DJANGO_SUPERUSER_USERNAME: admin
-      DJANGO_SUPERUSER_PASSWORD: admin
-      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      DATABASE_URL: postgresql://pennypilot:pennypilot@pennypilot-db:5432/pennypilot
+      SEED_ON_START: "true"
     depends_on:
       pennypilot-db:
         condition: service_healthy

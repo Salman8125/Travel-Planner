@@ -70,18 +70,21 @@ curl -X POST http://localhost:4002/search_hotels \
 curl -X POST http://localhost:4002/get_hotel_details \
   -H "Content-Type: application/json" -d '{"hotelId":"HT-2001"}'
 
-# PennyPilot — budget (4003) — Django + Postgres, per-user, auth required.
-# 1) register (or login) to get a token, then send it as: Authorization: Token <token>
-curl -X POST http://localhost:4003/register \
-  -H "Content-Type: application/json" -d '{"username":"alice","password":"s3cretpw123"}'
-# 2) use the returned token (export TOKEN=...) on the budget skills:
-curl -X POST http://localhost:4003/set_budget \
-  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{"totalBudget":5000}'
-curl -X POST http://localhost:4003/check_expense \
-  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{"amount":1200}'
-curl -X POST http://localhost:4003/get_remaining_budget \
-  -H "Content-Type: application/json" -H "Authorization: Token $TOKEN" -d '{}'
-# Django admin (inspect users/budgets/expenses): http://localhost:4003/admin  (admin / admin)
+# PennyPilot — budget (4003) — Django + DRF + Postgres, per-user, JWT auth. Base path /api.
+# 1) login (seeded user) to get a JWT access token, then send: Authorization: Bearer <access>
+curl -X POST http://localhost:4003/api/auth/login \
+  -H "Content-Type: application/json" -d '{"email":"user@pennypilot.dev","password":"user12345"}'
+# 2) use the returned access token (export TOKEN=...) on the budget endpoints:
+curl -X POST http://localhost:4003/api/budgets \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"Groceries","total_amount":"500.00","currency":"USD","period":"MONTHLY","start_date":"2026-01-01"}'
+# 3) record an expense against the returned budget id, then read its status:
+curl -X POST http://localhost:4003/api/budgets/$BUDGET_ID/expenses \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"amount":"120.00","date":"2026-01-15","description":"shopping"}'
+curl http://localhost:4003/api/budgets/$BUDGET_ID/status -H "Authorization: Bearer $TOKEN"
+# Interactive docs: http://localhost:4003/docs   ·   Django admin: http://localhost:4003/admin
+#   (seeded accounts: admin@pennypilot.dev / admin12345,  user@pennypilot.dev / user12345)
 
 # Weathervane — weather (4004)
 curl -X POST http://localhost:4004/get_forecast \
@@ -118,10 +121,13 @@ Each backend keeps two layers separate:
 - **HTTP layer** — a thin server exposing one `POST /<skill>` endpoint per skill: parse body →
   call a domain function → return JSON. It exists only so the product runs standalone now.
 
-No backend imports or calls another backend. **PennyPilot** persists per-user budgets in
-**PostgreSQL** and is protected with **DRF Token auth** (register/login → token); its pure budget
-rules live in `PennyPilot/backend/budget/domain.py`, separate from the Django models (persistence)
-and DRF views (HTTP). Django **admin** is at `http://localhost:4003/admin` (`admin` / `admin`).
+No backend imports or calls another backend. **PennyPilot** is a production-grade budget & expense
+API (Django + DRF + **PostgreSQL**, **JWT** auth) under base path `/api`. All business logic lives in a
+transport-agnostic **service/selector layer** (`apps/budgets/services.py`, `selectors.py`, pure rules in
+`domain.py`) that the A2A executor will wrap later — DRF views stay thin. Recording an expense row-locks
+the budget (`SELECT … FOR UPDATE`) so it can never overspend or double-count under concurrency. Interactive
+docs at `http://localhost:4003/docs`; Django **admin** at `http://localhost:4003/admin`
+(`admin@pennypilot.dev` / `admin12345`).
 
 ## Run a single product standalone (without Docker)
 
@@ -135,10 +141,11 @@ cd SkyScout/backend && npm install && npm run dev          # or: npm run build &
 # Roost backend (JDK 21 + Maven)
 cd Roost/backend && mvn spring-boot:run                     # → :4002
 
-# PennyPilot backend (Python 3.12+, needs a Postgres reachable via POSTGRES_* env vars)
+# PennyPilot backend (Python 3.12+, needs Postgres via DATABASE_URL or POSTGRES_* env vars)
 cd PennyPilot/backend && pip install -r requirements.txt && \
-  python manage.py migrate && \
-  python manage.py runserver 0.0.0.0:4003                    # → :4003 (admin at /admin)
+  DATABASE_URL=postgresql://pennypilot:pennypilot@localhost:5432/pennypilot \
+  python manage.py migrate && python manage.py seed && \
+  python manage.py runserver 0.0.0.0:4003                    # → :4003 (REST /api, docs /docs, admin /admin)
 
 # Weathervane backend (Go 1.23+)
 cd Weathervane/backend && go run ./cmd/server               # → :4004
