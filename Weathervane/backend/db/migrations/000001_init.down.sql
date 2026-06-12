@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS current_weather;
+DROP TABLE IF EXISTS daily_forecasts;
+DROP TABLE IF EXISTS locations;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS condition;
+DROP TYPE IF EXISTS user_role;

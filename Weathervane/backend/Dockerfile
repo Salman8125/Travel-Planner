@@ -1,13 +1,9 @@
-# Multi-stage: build a static binary, run on distroless (near-scratch + CA certs).
-FROM golang:1.23-alpine AS build
+FROM golang:1.25 AS build
 WORKDIR /src
-COPY go.mod ./
-RUN go mod download
 COPY . .
-# CGO_ENABLED=0 is required for a static binary that runs on distroless/static.
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/api ./cmd/api
 
 FROM gcr.io/distroless/static-debian12 AS runtime
-COPY --from=build /out/server /server
-EXPOSE 4004
-ENTRYPOINT ["/server"]
+COPY --from=build /out/api /api
+EXPOSE 8080
+ENTRYPOINT ["/api"]

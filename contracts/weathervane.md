@@ -1,39 +1,64 @@
 # Weathervane (weather) contract
 
-Product: **Weathervane** — weather forecast. Backend stack: **Go (standard library)**. Published port: **4004**.
+Product: **Weathervane** — weather forecast. Backend stack: **Go (chi) + PostgreSQL**.
+Published port: **4004** (gunicorn-equivalent: the Go service binds `:8080` in-container; compose maps `4004:8080`).
+Base path: `/api`. Times are UTC / ISO-8601; temperatures are °C.
 
-> Language-neutral contract. Returns a **plain array** — NO streaming/SSE (that is an
-> A2A-phase concern). NO shared code package; does NOT call any other backend.
+> Production REST API (was a stdlib mock with `POST /get_forecast`). Public reads are open;
+> admin writes require an ADMIN JWT. Does NOT call any other backend. SSE streaming is a
+> documented A2A-phase concern — `GET /api/forecast/stream` returns `501 not_implemented`.
+
+## Envelopes
+- Success: `{ "data": ... }`. Lists add `meta`: `{ "data": [...], "meta": { page, pageSize, total, totalPages } }`.
+- Error (all failures): `{ "error": { "code", "message", "details"?, "requestId" } }` + an `X-Request-Id` response header.
+  Codes → status: `validation_error`(400), `unauthorized`(401), `forbidden`(403), `not_found`(404),
+  `conflict`(409), `throttled`(429), `internal_error`(500).
 
 ## Data shapes
 
 ### DailyForecast
-| field     | type             | notes                                  |
-|-----------|------------------|----------------------------------------|
-| date      | string (YYYY-MM-DD) | e.g. `"2026-07-01"`                 |
-| high      | number           | high temperature, **°C**               |
-| low       | number           | low temperature, **°C**                |
-| condition | string           | e.g. `"Sunny"`, `"Cloudy"`, `"Rain"`   |
+| field               | type               | notes                          |
+|---------------------|--------------------|--------------------------------|
+| date                | string (YYYY-MM-DD) | `"2026-07-01"`                |
+| high                | number (°C)        | high temperature               |
+| low                 | number (°C)        | low temperature                |
+| condition           | string (enum)      | `SUNNY, CLOUDY, PARTLY_CLOUDY, RAINY, SNOWY, WINDY, FOGGY, STORMY` |
+| precipitationChance | int 0–100, optional |                               |
+| humidity            | int 0–100, optional |                               |
+| windKph             | number, optional   |                                |
 
-## Endpoints
+### Location
+`{ id (uuid), name, city, country, latitude, longitude, timezone (IANA), createdAt, updatedAt }`.
 
-### POST /get_forecast
-Return a multi-day forecast for a city.
+### CurrentWeather
+`{ locationId, tempC, condition, humidity?, windKph?, observedAt }`.
 
-Request body:
-```json
-{ "city": "London", "days": 5 }
-```
-`city` optional (case-insensitive; omitted = a default city). `days` optional, default `5`,
-clamped to the available mock range.
+## Endpoints (all under `/api`)
+**Public (no auth)**
+- `GET /api/locations?q=&country=&page=&pageSize=` → paginated `{data,meta}`.
+- `GET /api/locations/:id` → `{data: Location}` (404 if absent).
+- `GET /api/forecast?locationId=&startDate=&endDate=` (or `?city=&country=`) → `{data: DailyForecast[]}`.
+  startDate ≤ endDate; span capped at 16 days (400 if exceeded); empty range → `200 {data:[]}`;
+  unknown location → 404; `?city=` matching multiple → 409 (specify `country`).
+- `GET /api/weather/current?locationId=` (or `?city=`) → `{data: CurrentWeather}`.
 
-Response: `DailyForecast[]`
-```json
-[
-  { "date": "2026-07-01", "high": 24.0, "low": 15.0, "condition": "Sunny" },
-  { "date": "2026-07-02", "high": 21.0, "low": 14.0, "condition": "Cloudy" }
-]
-```
+**Auth** — `POST /api/auth/register {email,password}` → 201 `{data:{token,user}}`;
+`POST /api/auth/login` → 200 `{data:{token,user}}` (generic 401, no email-existence leak);
+`GET /api/auth/me` (Bearer) → `{data: user}`. Role ∈ {USER, ADMIN}.
+
+**Admin (ADMIN Bearer token)** — `POST /api/locations`, `PATCH /api/locations/:id`,
+`DELETE /api/locations/:id` (204); `PUT /api/locations/:id/forecast` (idempotent upsert on
+(location_id, date)); `PUT /api/locations/:id/current`. 401 if no/invalid token, 403 for a USER token.
+
+**Ops** — `GET /health` → `{status:"ok"}`; `GET /ready` → `{status:"ready",db:"up"}` or 503;
+`GET /docs` (Swagger UI) · `GET /openapi.yaml` · `GET /metrics` (Prometheus). A request that exceeds
+the server deadline (or is cancelled) returns 503 `timeout`.
+
+## Seeded accounts
+`admin@weathervane.dev` / `admin12345` (ADMIN) · `user@weathervane.dev` / `user12345` (USER).
+~10 seeded locations (Istanbul, Islamabad, Lahore, Dubai, Doha, London, New York, Tokyo, Paris,
+Sydney) with IANA timezones, 14 days of daily forecasts each + current weather.
 
 ## CORS
-Permissive (dev only): allow any origin, methods `POST, OPTIONS`, header `Content-Type`.
+Allows any origin; methods `GET, POST, PATCH, PUT, DELETE, OPTIONS`; headers `Content-Type,
+Authorization, X-Request-Id` (so the browser SPA can call it cross-origin).

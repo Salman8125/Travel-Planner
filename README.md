@@ -24,7 +24,7 @@ Postgres database for PennyPilot — 11 containers in total).
 | **SkyScout**    | flights   | Node + TypeScript  | 4001    | React (Vite)   | 3001    | http://localhost:3001 |
 | **Roost**       | hotels    | Java + Spring Boot | 4002    | Angular        | 3002    | http://localhost:3002 |
 | **PennyPilot**  | budget    | Python + Django + Postgres | 4003 | SvelteKit (SPA) | 3003 | http://localhost:3003 |
-| **Weathervane** | weather   | Go (stdlib)        | 4004    | Vue (Vite)     | 3004    | http://localhost:3004 |
+| **Weathervane** | weather   | Go (chi) + Postgres | 4004   | Vue (Vite)     | 3004    | http://localhost:3004 |
 | **TripWeaver**  | itinerary | C# / ASP.NET       | 4005    | SolidJS (Vite) | 3005    | http://localhost:3005 |
 
 The language-neutral data shapes + endpoints are documented in [`/contracts`](./contracts)
@@ -86,9 +86,19 @@ curl http://localhost:4003/api/budgets/$BUDGET_ID/status -H "Authorization: Bear
 # Interactive docs: http://localhost:4003/docs   ·   Django admin: http://localhost:4003/admin
 #   (seeded accounts: admin@pennypilot.dev / admin12345,  user@pennypilot.dev / user12345)
 
-# Weathervane — weather (4004)
-curl -X POST http://localhost:4004/get_forecast \
-  -H "Content-Type: application/json" -d '{"city":"London","days":5}'
+# Weathervane — weather (4004) — Go + chi + Postgres, JWT auth, base path /api.
+# Public reads (no token):
+curl "http://localhost:4004/api/locations?q=Ist"                       # -> {data:[...],meta:{...}}
+curl "http://localhost:4004/api/forecast?city=London"                  # -> {data:[DailyForecast]}
+# Admin upsert: login then PUT a forecast row (idempotent on location+date):
+curl -X POST http://localhost:4004/api/auth/login \
+  -H "Content-Type: application/json" -d '{"email":"admin@weathervane.dev","password":"admin12345"}'
+#   export TOKEN=...  then:
+curl -X PUT http://localhost:4004/api/locations/$LOC_ID/forecast \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"date":"2026-07-01","high":31,"low":20,"condition":"SUNNY","humidity":45}'
+# Interactive docs: http://localhost:4004/docs
+#   (seeded accounts: admin@weathervane.dev / admin12345,  user@weathervane.dev / user12345)
 
 # TripWeaver — itinerary (4005) — composes the four inputs (no backend-to-backend calls)
 curl -X POST http://localhost:4005/build_itinerary \
@@ -147,8 +157,10 @@ cd PennyPilot/backend && pip install -r requirements.txt && \
   python manage.py migrate && python manage.py seed && \
   python manage.py runserver 0.0.0.0:4003                    # → :4003 (REST /api, docs /docs, admin /admin)
 
-# Weathervane backend (Go 1.23+)
-cd Weathervane/backend && go run ./cmd/server               # → :4004
+# Weathervane backend (Go 1.25+, needs Postgres) — migrations + seed run in-process at startup
+cd Weathervane/backend && \
+  DATABASE_URL=postgresql://weather:weather@localhost:5432/weather \
+  JWT_SECRET=dev-secret SEED_ON_START=true ADDR=:4004 go run ./cmd/api   # → :4004 (REST /api, docs /docs)
 
 # TripWeaver backend (.NET 8 SDK)
 cd TripWeaver/backend && dotnet run                         # → :4005

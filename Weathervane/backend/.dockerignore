@@ -1,5 +1,8 @@
-server
 .git
 .gitignore
-Dockerfile
-.dockerignore
+*.log
+.env
+bin/
+*.test
+README.md
+Makefile
