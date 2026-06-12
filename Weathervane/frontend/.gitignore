@@ -3,12 +3,9 @@ dist
 coverage
 playwright-report
 test-results
-npm-debug.log*
-*.log
-.git
-.gitignore
 .env
 .env.*
-.vscode
-Dockerfile
-.dockerignore
+!.env.example
+*.local
+*.log
+.DS_Store
