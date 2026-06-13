@@ -1,0 +1,17 @@
+roost:
+  jwt:
+    secret: test-secret-please-change-test-secret-please-change
+    ttl: 1h
+  seed:
+    enabled: true
+  rate-limit:
+    enabled: false
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.travelplanner.roost: INFO
+    org.testcontainers: INFO

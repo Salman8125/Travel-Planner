@@ -48,10 +48,35 @@ services:
     ports: ["3001:80"]
     depends_on: [skyscout-backend]
 
-  # ---------------- Roost — hotels (Spring Boot / Angular) ----------------
+  # ---------------- Roost — hotels (Spring Boot + Postgres / Angular) ----------------
+  roost-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: roost
+      POSTGRES_USER: roost
+      POSTGRES_PASSWORD: roost
+    volumes:
+      - roost-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roost -d roost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   roost-backend:
     build: ./Roost/backend
-    ports: ["4002:4002"]
+    # Host 4002 (the Angular frontend's target) -> container 8080 (Spring Boot).
+    ports: ["4002:8080"]
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://roost-db:5432/roost
+      SPRING_DATASOURCE_USERNAME: roost
+      SPRING_DATASOURCE_PASSWORD: roost
+      ROOST_JWT_SECRET: dev-insecure-roost-jwt-secret-change-me-please
+      ROOST_SEED_ENABLED: "true"
+    depends_on:
+      roost-db:
+        condition: service_healthy
 
   roost-frontend:
     build:
@@ -149,3 +174,4 @@ volumes:
   pennypilot-db-data:
   skyscout-db-data:
   weathervane-db-data:
+  roost-db-data:

@@ -3,5 +3,7 @@ target
 .gitignore
 .idea
 *.iml
+*.log
+.env
 Dockerfile
 .dockerignore

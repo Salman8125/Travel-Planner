@@ -1,0 +1,48 @@
+package com.travelplanner.roost.room;
+
+import com.travelplanner.roost.common.web.ApiEnvelope;
+import com.travelplanner.roost.room.dto.AvailabilityNightDto;
+import com.travelplanner.roost.room.dto.AvailabilityUpsertRequest;
+import com.travelplanner.roost.room.dto.RoomTypeDto;
+import com.travelplanner.roost.room.dto.UpdateRoomTypeRequest;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/room-types")
+public class RoomController {
+
+    private final RoomService roomService;
+
+    public RoomController(RoomService roomService) {
+        this.roomService = roomService;
+    }
+
+    @PatchMapping("/{id}")
+    public ApiEnvelope<RoomTypeDto> update(
+            @PathVariable UUID id, @Valid @RequestBody UpdateRoomTypeRequest request) {
+        return ApiEnvelope.of(roomService.updateRoomType(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id) {
+        roomService.deleteRoomType(id);
+    }
+
+    @PutMapping("/{id}/availability")
+    public ApiEnvelope<List<AvailabilityNightDto>> upsertAvailability(
+            @PathVariable UUID id, @Valid @RequestBody AvailabilityUpsertRequest request) {
+        return ApiEnvelope.of(roomService.upsertAvailability(id, request));
+    }
+}

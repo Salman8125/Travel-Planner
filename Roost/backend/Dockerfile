@@ -1,14 +1,20 @@
-# Multi-stage: build the fat jar with Maven, run on a slim JRE.
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
-# Cache dependencies before copying sources so source edits don't re-download the world.
-COPY pom.xml .
-RUN mvn -q -B dependency:go-offline
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN ./mvnw -B -q dependency:go-offline
 COPY src ./src
-RUN mvn -q -B clean package -DskipTests
+RUN ./mvnw -B -q -DskipTests clean package \
+    && java -Djarmode=layertools -jar target/app.jar extract --destination target/extracted
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
-EXPOSE 4002
-ENTRYPOINT ["java", "-jar", "app.jar"]
+RUN apk add --no-cache wget
+COPY --from=build /app/target/extracted/dependencies/ ./
+COPY --from=build /app/target/extracted/spring-boot-loader/ ./
+COPY --from=build /app/target/extracted/snapshot-dependencies/ ./
+COPY --from=build /app/target/extracted/application/ ./
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 \
+    CMD wget -qO- http://localhost:8080/actuator/health/readiness || exit 1
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

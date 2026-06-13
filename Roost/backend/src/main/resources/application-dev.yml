@@ -1,0 +1,13 @@
+roost:
+  jwt:
+    secret: ${ROOST_JWT_SECRET:dev-insecure-roost-jwt-secret-change-me-please}
+  seed:
+    enabled: ${ROOST_SEED_ENABLED:true}
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.travelplanner.roost: DEBUG
