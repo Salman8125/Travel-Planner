@@ -1,6 +1,11 @@
 bin
 obj
+TripWeaver.Tests
 .git
 .gitignore
 Dockerfile
 .dockerignore
+appsettings.Development.json
+.env
+*.user
+.vs

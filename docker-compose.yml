@@ -157,10 +157,33 @@ services:
     ports: ["3004:80"]
     depends_on: [weathervane-backend]
 
-  # ---------------- TripWeaver — itinerary (ASP.NET / SolidJS) ----------------
+  # ---------------- TripWeaver — itinerary (.NET 10 + Postgres / SolidJS) ----------------
+  tripweaver-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tripweaver
+      POSTGRES_USER: tripweaver
+      POSTGRES_PASSWORD: tripweaver
+    volumes:
+      - tripweaver-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tripweaver -d tripweaver"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   tripweaver-backend:
     build: ./TripWeaver/backend
-    ports: ["4005:4005"]
+    # Host 4005 (the SolidJS frontend's target) -> container 8080 (.NET).
+    ports: ["4005:8080"]
+    environment:
+      ConnectionStrings__Default: "Host=tripweaver-db;Port=5432;Database=tripweaver;Username=tripweaver;Password=tripweaver"
+      Jwt__Secret: dev-insecure-tripweaver-jwt-secret-change-me-please
+      Seed__Enabled: "true"
+      RateLimit__Enabled: "true"
+    depends_on:
+      tripweaver-db:
+        condition: service_healthy
 
   tripweaver-frontend:
     build:
@@ -175,3 +198,4 @@ volumes:
   skyscout-db-data:
   weathervane-db-data:
   roost-db-data:
+  tripweaver-db-data:

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TripWeaver.csproj" />
+  <Project Path="TripWeaver.Tests/TripWeaver.Tests.csproj" />
+</Solution>
