@@ -1,0 +1,26 @@
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+/node_modules
+npm-debug.log*
+yarn-error.log
+
+# Angular build cache
+/.angular/cache
+.sass-cache/
+
+# Tests / coverage / E2E artifacts
+/coverage
+/test-results
+/playwright-report
+/playwright/.cache
+
+# IDE / OS
+.idea/
+.history/
+.DS_Store
+Thumbs.db

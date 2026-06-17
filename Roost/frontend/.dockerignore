@@ -5,3 +5,9 @@ dist
 .gitignore
 Dockerfile
 .dockerignore
+coverage
+out-tsc
+e2e
+test-results
+playwright-report
+*.log
