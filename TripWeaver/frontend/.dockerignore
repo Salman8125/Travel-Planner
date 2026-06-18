@@ -5,3 +5,9 @@ npm-debug.log*
 .gitignore
 Dockerfile
 .dockerignore
+.env
+.env.*
+coverage
+playwright-report
+test-results
+*.log
